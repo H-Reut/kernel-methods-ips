@@ -21,9 +21,7 @@ v[0,:] = np.random.rand(M) + np.ones((M))
 # interaction function
 def Hβ(x_i, x_j):
     # global β
-    return 1 / (1 + np.linalg.norm(x_i - x_j)**2) #**β
-
-
+    return 1 / (1 + np.linalg.norm(x_i - x_j)**2)**2 # β=2
 
 # solving
 for n in range(N-1):
@@ -32,7 +30,10 @@ for n in range(N-1):
     for i in range(M):
         sum = 0.0
         for j in range(M):
-            Hβ(x[n,i], x[n,j]) * (v[n,j] - v[n,i])
+            sum += Hβ(x[n,i], x[n,j]) * (v[n,j] - v[n,i])
         v[n+1,i] = v[n,i] + (Δt/M)*sum 
 
-print()
+plt.plot(t, x)
+plt.show()
+plt.plot(t, v)
+plt.show()
