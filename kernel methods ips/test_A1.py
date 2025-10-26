@@ -24,14 +24,14 @@ v[0,:] = np.random.rand(M) + np.ones((M))   # random velocities in interval [1,2
 β = 2                           
 γ = 1/np.sqrt(2)
 
-# interaction function
-def H_β(x_i, x_j):
-    return 1 / (1 + np.linalg.norm(x_i - x_j)**2)**β
+# interaction function H_β(x-xʹ) and SE-kernel k_γ(x, xʹ)
+#       As part of H_β and k_γ we have to calculate the 2-norm  ||x − xʹ||
+#       This model is 1d, and np.linalg.norm() doesn't work on scalars, so instead we use np.abs()
+#       Also, instead of implementing H_β(x, xʹ), we implement H_β(diff) which must be called with diff=x-xʹ
+def H_β(diff):
+    return 1 / (1 + np.abs(diff)**2)**β
 
-# SE-kernel (squared exponential)
 def k_γ(x, xʹ):
-    # As part of k_γ we have to calculate the 2-norm  ||x − xʹ||
-    # This model is 1d, and np.linalg.norm doesn't work on scalars, so instead we use np.abs
     return np.exp(np.abs(x - xʹ)**2 / (-2.0 * γ**2))
 
 # interpolation parameter
@@ -39,15 +39,29 @@ s = 4       # number of time samples
 
 
 ########## Calculations ##########
-# solving
-for n in range(N-1):
-    print(f"\tsolving time step:\t{str(n).rjust(len(str(N-1)))} / {N-1}\t({n/(N-1):.0%})", end="\r")
+# iterative solver (slower)
+'''for n in range(N-1):
+    print(f"\tsolving time step:\t{str(n+1).rjust(len(str(N-1)))} / {N-1}\t({(n+1)/(N-1):.0%})", end="\r")
+    # solving x
     x[n+1,:] = x[n,:] + Δt*v[n,:]
+    # solving v
     for i in range(M):
         sum = 0.0
         for j in range(M):
-            sum += H_β(x[n,i], x[n,j]) * (v[n,j] - v[n,i])
+            sum += H_β(x[n,i] - x[n,j]) * (v[n,j] - v[n,i])
         v[n+1,i] = v[n,i] + (Δt/M)*sum 
+print()'''
+
+# numpy solver (faster)
+for n in range(N-1):
+    print(f"\tsolving time step:\t{str(n+1).rjust(len(str(N-1)))} / {N-1}\t({(n+1)/(N-1):.0%})", end="\r")
+    # solving x
+    x[n+1,:] = x[n,:] + Δt*v[n,:]
+    # solving v
+    diffx = x[n,:,np.newaxis] - np.transpose(x[n,:], axes=(0))  # diffx[i,j] = x_i-x_j
+    diffv = np.transpose(v[n,:], axes=(0)) - v[n,:,np.newaxis]  # diffv[i,j] = v_j-v_i
+    v[n+1] = v[n] + (Δt/M) * np.sum(H_β(diffx) * diffv, 1)
+print()
 
 # variance
 𝒱 = v.var(axis=1)
@@ -63,10 +77,10 @@ print(f'Kernel-Matrix:\tK = \n{K}\n\tNow solving y=Kα for α')
 print(f'α = {α}')
 
 # calculating the interpolation function 𝒱ˆ
-k = k_γ(t_samples[:,np.newaxis], t)   # k[n, i] = k_γ(t_n, t_i), where t_i is a time sample, t_n is arbitrary
-𝒱ˆ = α @ k
+K = k_γ(t_samples[:,np.newaxis], t)   # K[n, i] = k_γ(t_n, t_i), where t_i is a time sample, t_n is arbitrary
+𝒱ˆ = α @ K
 
-# error
+# error |𝒱-𝒱ˆ|
 err = np.abs(𝒱 - 𝒱ˆ)
 print(f'Timestep samples:\t{t_samples}\nErrors at samples\t{err[t_samples_indices]}')
 
