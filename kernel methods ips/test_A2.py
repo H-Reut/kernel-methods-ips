@@ -98,7 +98,7 @@ plt.show()
 # error plot
 plt.semilogy(β_values, err, '.', label="error")
 locations, labels = plt.xticks()
-plt.xticks(β_samples, minor=False)
+plt.xticks(β_samples, minor=False) #[' ']*s, 
 plt.grid(True, which='major', axis='x')
 plt.xticks(locations, labels=locations, minor=True)
 plt.plot(β_samples, err[β_samples_indices], marker='o', markeredgecolor='r', fillstyle='none', linestyle=' ', label="known data points")
