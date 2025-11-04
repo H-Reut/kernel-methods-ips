@@ -58,8 +58,8 @@ for n in range(N-1):
     # solving x
     x[n+1,:] = x[n,:] + Δt*v[n,:]
     # solving v
-    diffx = x[n,:,np.newaxis] - np.transpose(x[n,:], axes=(0))  # diffx[i,j] = x_i-x_j
-    diffv = np.transpose(v[n,:], axes=(0)) - v[n,:,np.newaxis]  # diffv[i,j] = v_j-v_i
+    diffx = x[n,:,np.newaxis] - x[n,:]  # diffx[i,j] = x_i-x_j
+    diffv = v[n,:] - v[n,:,np.newaxis]  # diffv[i,j] = v_j-v_i
     v[n+1] = v[n] + (Δt/M) * np.sum(H_β(diffx) * diffv, 1)
 print()
 
