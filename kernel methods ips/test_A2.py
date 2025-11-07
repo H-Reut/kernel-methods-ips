@@ -1,5 +1,7 @@
 ﻿import numpy as np
 import matplotlib.pyplot as plt
+import shared_functions
+
 
 ########## Parameters ##########
 # time
@@ -20,88 +22,82 @@ print(f'Number of agents:\tM = {M}')
 x[0,:] = np.random.rand(M) + np.ones((M))   # random positions  in interval [1,2]
 v[0,:] = np.random.rand(M) + np.ones((M))   # random velocities in interval [1,2]
 
-# model parameter              
-γ = 1/np.sqrt(2)
-
-# SE-kernel k_γ(x, xʹ)
-#       As part of H_β and k_γ we have to calculate the 2-norm  ||x − xʹ||
-#       This model is 1d, and np.linalg.norm() doesn't work on scalars, so instead we use np.abs()
-def k_γ(x, xʹ):
-    return np.exp(np.abs(x - xʹ)**2 / (-2.0 * γ**2))
+# model parameter
+β_N = 101           # Number of values for β      
+γ = 1.0/np.sqrt(2)    # parameter of k_γ
 
 # interpolation parameter
 s = 5       # number of samples of values for β
 
 
-########## Calculations ##########
-# numpy solver (faster)
-def solver(x, v, β):
-    # interaction function H_β(x-xʹ)
-    #       Instead of implementing H_β(x, xʹ), we implement H_β(diff) which must be called with diff=x-xʹ
-    def H_β(diff):
-        return 1 / (1 + np.abs(diff)**2)**β
+# Interaction function H_β(x-xʹ) for Cucker-Smale systems
+def H_β(diff, β=2.0):
+    # As part of H_β we have to calculate the 2-norm  ||x − xʹ||
+    # Instead of H_β(x, xʹ), we implement H_β(diff) which must be called with diff=x-xʹ
+    # The model is 1d, and np.linalg.norm() doesn't work on scalars, so instead we use np.abs()
+    return 1 / (1 + np.abs(diff)**2)**β
 
+
+########## Solving positions (x) and velocities (v) ##########
+def solver_Cucker_Smale(x, v, β):
     for n in range(N-1):
+        #print(f"\tsolving time step:\t{str(n+1).rjust(len(str(N-1)))} / {N-1}\t({(n+1)/(N-1):.0%})", end="\r")
         # solving x
-        x[n+1,:] = x[n,:] + Δt*v[n,:]
+        x[n+1,:] = x[n,:] + Δt*v[n,:]       # x[n+1,:] shape: (M,)
         # solving v
-        diffx = x[n,:,np.newaxis] - x[n,:]  # diffx[i,j] = x_i-x_j
-        diffv = v[n,:] - v[n,:,np.newaxis]  # diffv[i,j] = v_j-v_i
-        v[n+1] = v[n] + (Δt/M) * np.sum(H_β(diffx) * diffv, 1)
+        diffx = x[n,:,np.newaxis] - x[n,:]  # diffx[i,j] = x_i-x_j    diffx shape: (M, M)
+        diffv = v[n,:] - v[n,:,np.newaxis]  # diffv[i,j] = v_j-v_i    diffv shape: (M, M)
+        v[n+1,:] = v[n,:] + (Δt/M) * np.sum(H_β(diffx, β) * diffv, 1)     # v[n+1] shape: (M,)
+    #print()
     return x, v
 
-def 𝒥(β):
-    _, v_β = solver(x.copy(), v.copy(), β)
-    𝒱_β = v_β.var(axis=1)
-    return Δt * np.sum(𝒱_β)
+
+########## J and interpolation ##########
+# functional J(β):= ∫ₜ₀ᵀ Var(v(t)) dt  (variance of velocities integrated over time)
+def J(β):
+    _, v_β = solver_Cucker_Smale(x.copy(), v.copy(), β)
+    v_β_var = v_β.var(axis=1)    # variance of velocities for each time step, shape: (N,)
+    return Δt * np.sum(v_β_var)
 
 
-β_N = 101           # Number of values for β
 β_values = np.linspace(0.0, 5.0, β_N)
-𝒥_values = np.zeros((β_N))
+J_values = np.zeros((β_N))
 for i in range(β_N):
-    print(f"\tcalculating 𝒥(β) step:\t{str(i).rjust(len(str(β_N)))} / {β_N}\t({(i)/(β_N):.0%})", end="\r")
+    print(f"\tcalculating J(β)\tstep:\t{str(i).rjust(len(str(β_N)))} / {β_N}\t({(i)/(β_N):.0%})", end="\r")
     β = β_values[i]
-    𝒥_values[i] = 𝒥(β)
+    J_values[i] = J(β)
 print()
 
 
-# interpolation of 𝒥
+# interpolation of J
 β_samples_indices = ((β_N-1)//(s-1)) * np.arange(0, s, 1)
 β_samples = β_values[β_samples_indices]
-y = 𝒥_values[β_samples_indices]
-print(f'\nIndices of time samples:\tt_samples_indices = {β_samples_indices}\nTime samples:\tt_samples = {β_samples}\nVariance of velocities at time samples:\ty={y}')
-K = k_γ(β_samples[:,np.newaxis], β_samples)   # Kernel-matrix / Gram-matrix
-print(f'Kernel-Matrix:\tK = \n{K}\n\tNow solving y=Kα for α')
-α = np.linalg.solve(K, y)
-print(f'α = {α}')
+y = J_values[β_samples_indices]
+J_int = shared_functions.interpolate(β_values, β_samples_indices, y, lambda x, xʹ: shared_functions.k_γ(x, xʹ, γ))
 
-# calculating the interpolation function 𝒥ˆ
-K = k_γ(β_samples[:,np.newaxis], β_values)   # K[n, i] = k_γ(t_n, t_i), where t_i is a time sample, t_n is arbitrary
-𝒥ˆ = α @ K
-
-# error |𝒥_values-𝒥ˆ|
-err = np.abs(𝒥_values - 𝒥ˆ)
-print(f'Timestep samples:\t{β_samples}\nErrors at samples\t{err[β_samples_indices]}')
-
-
-########## Plotting ##########
-# 𝒥 and approximated 𝒥ˆ over time (t)
-plt.plot(β_values, 𝒥_values, label="$\\mathcal{J}$")
-plt.plot(β_values, 𝒥ˆ, 'r--', label="$\\mathcal{\\hat{J}}$")
+# Plotting J and interpolated J_int over time (t)
+plt.plot(β_values, J_values, label="$\\mathcal{J}$")
+plt.plot(β_values, J_int, 'r--', label="$\\mathcal{\\hat{J}}$")
 plt.plot(β_samples, y, marker='o', markeredgecolor='orange', fillstyle='none', linestyle=' ', label="known data points")
+#plt.gca().set_ylim(0, None)  # set y-axis bottom to 0
+plt.gca().set_xlim(t_0, T)  # set x-axis to interval [t_0, T]
 plt.title("Velocities variance")
 plt.xlabel("$\\beta$")
 plt.legend()
 plt.show()
 
-# error plot
+
+########## Interpolation error ##########
+err = np.abs(J_values - J_int)
+
+# Plotting
 plt.semilogy(β_values, err, '.', label="error")
-locations, labels = plt.xticks()
-plt.xticks(β_samples, minor=False) #[' ']*s, 
+'''locations, labels = plt.xticks()
+plt.xticks(β_samples, minor=False)
 plt.grid(True, which='major', axis='x')
-plt.xticks(locations, labels=locations, minor=True)
+plt.xticks(locations, labels=locations, minor=True)'''
 plt.plot(β_samples, err[β_samples_indices], marker='o', markeredgecolor='r', fillstyle='none', linestyle=' ', label="known data points")
+plt.gca().set_xlim(t_0, T)  # set x-axis to interval [t_0, T]
 plt.title("Error")
 plt.legend()
 plt.show()
