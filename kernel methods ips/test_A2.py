@@ -23,8 +23,9 @@ x[0,:] = np.random.rand(M) + np.ones((M))   # random positions  in interval [1,2
 v[0,:] = np.random.rand(M) + np.ones((M))   # random velocities in interval [1,2]
 
 # model parameter
-β_N = 101           # Number of values for β      
-γ = 1.0/np.sqrt(2)    # parameter of k_γ
+β_N = 101               # Number of different values for β
+β_values = np.linspace(0.0, 5.0, β_N)       # values for β
+γ = 1.0/np.sqrt(2)      # parameter of k_γ
 
 # interpolation parameter
 s = 5       # number of samples of values for β
@@ -60,7 +61,6 @@ def J(β):
     return Δt * np.sum(v_β_var)
 
 
-β_values = np.linspace(0.0, 5.0, β_N)
 J_values = np.zeros((β_N))
 for i in range(β_N):
     print(f"\tcalculating J(β)\tstep:\t{str(i).rjust(len(str(β_N)))} / {β_N}\t({(i)/(β_N):.0%})", end="\r")

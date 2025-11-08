@@ -1,6 +1,7 @@
 ﻿import numpy as np
 import matplotlib.pyplot as plt
 import shared_functions
+import time
 
 
 ########## Parameters ##########
@@ -10,24 +11,16 @@ T   =   10                      # end time
 N   = 1000                      # number of time steps
 Δt  = (T-t_0) / N               # Δt
 t   = np.linspace(t_0, T, N)    # all time steps
-print(f'Time interval:\tt_0 = {t_0}\t\tT = {T}\nTime steps:\tN = {N}')
 
 # agents
-M   = 30                        # number of agents
-x   = np.zeros((N,M))           # positions
-print(f'Number of agents:\tM = {M}')
-
-# initial values
-x[0,:] = np.random.rand(M) + np.ones((M))   # random positions in interval [1,2]
+M_values = np.array([   10,  100, 1000,np.inf])     # number of agents
 
 # model parameters
+s_values = np.array([ 8   , 8   , 8   , 8  ])     # number of time samples
 γ_values = 10/np.sqrt(2) / np.array([1, 1, 1, 1])    # parameters of kernel k_γ
-
-# interpolation parameter
-s_values = np.array([ 2   , 4   , 8   , 4   ])  # number of time samples
-𝜎_values = np.array([ 0.0 , 0.0 , 0.0 , 0.01])  # Add noise to the samples with normal distribution 𝒩(𝜇=0, 𝜎²) (𝜎: standard deviation)
-λ_values = np.array([ 0.0 , 0.0 , 0.0 , 0.01])  # regularization parameter λ for interpolation
-
+𝜎_values = np.array([ 0.0 , 0.0 , 0.0 , 0.0])     # Add noise to the samples with normal distribution 𝒩(𝜇=0, 𝜎²) (𝜎: standard deviation)
+λ_values = np.array([ 0.0 , 0.0 , 0.0 , 0.0])     # regularization parameter λ for interpolation
+assert len(M_values) == len(s_values) == len(γ_values) == len(𝜎_values) == len(λ_values), "Parameter arrays must have the same length"
 
 # Interaction function P(x-xʹ) for opinion dynamics model
 def P(diff):
@@ -48,16 +41,7 @@ def skewness_from_paper(x):
 
 
 ########## Solving positions (x) ##########
-for n in range(N-1):
-    print(f"\tsolving time step:\t{str(n+1).rjust(len(str(N-1)))} / {N-1}\t({(n+1)/(N-1):.0%})", end="\r")
-    # solving x
-    diffx = x[n,:] - x[n,:,np.newaxis]    # diffx[i,j] = x_j-v_i    diffx shape: (M, M)
-    x[n+1] = x[n] + (Δt/M) * np.sum(P(diffx) * diffx, 1)     # x[n+1] shape: (M,)
-print()
 
-# variance and skewness
-x_var = x.var(axis=1)
-x_skw = skewness_from_paper(x)
 
 # L_infinity norm of errors of v and skew for different s
 L_inf_var = np.zeros(len(s_values))
@@ -65,10 +49,31 @@ L_inf_skw = np.zeros(len(s_values))
 
 
 for i in range(len(s_values)):
+    M = int(M_values[i])
     s = s_values[i]
     γ = γ_values[i]
     𝜎 = 𝜎_values[i]
     λ = λ_values[i]
+    
+    # positions and initial values
+    print(f'Parameters:\tM = {M}\n\t\ts = {s}\n\t\tγ = {γ}\n\t\tσ = {𝜎}\n\t\tλ = {λ}')
+    x = np.zeros((N, M))
+    x[0,:] = np.random.rand(M) + np.ones((M))   # random positions in interval [1,2]
+
+    # solving
+    time_start = time.time()
+    for n in range(N-1):
+        print(f"\tsolving time step:\t{str(n+1).rjust(len(str(N-1)))} / {N-1}\t({(n+1)/(N-1):.0%})", end="\r")
+        # solving x
+        diffx = x[n,:] - x[n,:,np.newaxis]    # diffx[i,j] = x_j-v_i    diffx shape: (M, M)
+        x[n+1] = x[n] + (Δt/M) * np.sum(P(diffx) * diffx, 1)     # x[n+1] shape: (M,)
+    time_end = time.time()
+    print()
+    print(f'Solving time for M={M}:\n\t{time_end - time_start:.2f} seconds')
+
+    # variance and skewness
+    x_var = x.var(axis=1)
+    x_skw = skewness_from_paper(x)
 
     # time samples for interpolation
     t_samples_indices = ((N-1)//(s-1)) * np.arange(0, s, 1)     # shape: (s,)
@@ -87,6 +92,16 @@ for i in range(len(s_values)):
     L_inf_skw[i] = np.max(err_skw)
     
     ########## Plotting ##########
+    # Plotting positions (x) over time (t)
+    plt.plot(t, x)
+    plt.gca().set_xlim(t_0, T)  # set x-axis to interval [t_0, T]
+    plt.title("Positions")
+    plt.xlabel("$t$")
+    plt.ylabel("$x$")
+    plt.show()
+
+
+
     plt.switch_backend('TkAgg')
     fig, axs = plt.subplots(2, 2)
     plt.get_current_fig_manager().window.state('zoomed')    # fullscreen window
