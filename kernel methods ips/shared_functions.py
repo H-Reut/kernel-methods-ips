@@ -1,4 +1,6 @@
 ﻿import numpy as np
+import time
+import scipy.spatial.distance as spDist
 
 
 #def H_β(diff, β=2.0):
@@ -15,12 +17,13 @@ def k_γ(x, xʹ, γ=1.0/np.sqrt(2)):
     Squared-exponential kernel k_γ(x, x') = exp(-||x-x'||² / (2*γ²))
     The model is 1d, and np.linalg.norm() doesn't work on scalars, so we use np.abs()
     """
+    #print("k_γ called with x.shape = ", x.shape, "\tand xʹ.shape = ", xʹ.shape)
     return np.exp(np.abs(x - xʹ)**2 / (-2.0 * γ**2))
 
 
 def k_γ_doubleSum(x, xʹ, γ=1.0/np.sqrt(2)):
     """
-    Double-sum squared-exponential kernel k_M(x, x') = 1/M² Σᵢ Σⱼ k_γ(x_i, x'_j)
+    Double-sum kernel k_M(x, x') = 1/M² Σᵢ Σⱼ k_γ(x_i, x'_j)
     - x : shape (..., M)
     - xʹ: shape (..., M)
     """
@@ -29,44 +32,34 @@ def k_γ_doubleSum(x, xʹ, γ=1.0/np.sqrt(2)):
     return (1.0 / M**2) * np.sum(k_γ(x[...,:, np.newaxis], xʹ[...,np.newaxis, :], γ=γ), axis=(-1, -2))
 
 
-def interpolate(t_full, t_samples_indices, y_samples, k, λ=0.0):
-    """
-    Performs kernel interpolation using the kernel function k.
-    Returns the interpolated values at all time steps t_full.
-    - t_full: all time steps
-    - t_samples_indices: indices of sampled time steps in t_full
-    - y_samples: sampled values at t_full[t_samples_indices]
-    - k: kernel function to compute the Kernel/Gram matrix K
-    - λ: optional regularization parameter (default 0)
-    """
-    t_samples = t_full[t_samples_indices]    # shape: (s,)
-    s = len(t_samples)
-    #print(f'\nIndices of time samples:\tt_samples_indices = {t_samples_indices}\nTime samples:\tt_samples = {t_samples}\nValues at time samples:\ty={y_samples}')
-    # Kernel-matrix / Gram-matrix
-    # K[n, i] = kernel_function(t_n, t_i), where t_i ∈ t_samples, t_n ∈ t_full
-    K = k(t_samples[:,np.newaxis], t_full[np.newaxis,:])   # shape: (s, N)
-    #print(f'Now solving y=Kα for α with K=\n{K[:,t_samples_indices]}')
-    # coefficients α (shape: (s,))
-    α = np.linalg.solve(K[:,t_samples_indices] + s*λ*np.eye(s), y_samples)       # with K[:,t_samples_indices] shape: (s, s)]
-    return α @ K    # values of interpolation function with shape: (N,)
 
-def interpolate2(t_full, t_samples_indices, y_samples, k, λ=0.0):
+def interpolate(x_full, samples_indices, y_samples, k, λ=0.0):
     """
     Performs kernel interpolation using the kernel function k.
     Returns the interpolated values at all time steps t_full.
-    - t_full: all time steps
-    - t_samples_indices: indices of sampled time steps in t_full
+    - x_full: all time steps
+    - samples_indices: indices of sampled time steps in t_full
     - y_samples: sampled values at t_full[t_samples_indices]
     - k: kernel function to compute the Kernel/Gram matrix K
     - λ: optional regularization parameter (default 0)
     """
-    t_samples = t_full[t_samples_indices]    # shape: (s,)
-    s = len(t_samples)
-    #print(f'\nIndices of time samples:\tt_samples_indices = {t_samples_indices}\nTime samples:\tt_samples = {t_samples}\nValues at time samples:\ty={y_samples}')
+    x_samples = x_full[samples_indices]
+    s = len(x_samples)
+    M = x_full.shape[0]
+    #print(f'\nIndices of samples:\tsamples_indices = {samples_indices}\nsamples:\tx_samples = {x_samples}\ny values at samples:\ty={y_samples}')
     # Kernel-matrix / Gram-matrix
-    # K[n, i] = kernel_function(t_n, t_i), where t_i ∈ t_samples, t_n ∈ t_full
-    K = k(t_samples[:,np.newaxis], t_full[np.newaxis,:])   # shape: (s, N)
-    #print(f'Now solving y=Kα for α with K=\n{K[:,t_samples_indices]}')
-    # coefficients α (shape: (s,))
-    α = np.linalg.solve(K[:,t_samples_indices] + s*λ*np.eye(s), y_samples)       # with K[:,t_samples_indices] shape: (s, s)]
+    # K[i, j] = kernel_function(x_j, x_i), where x_j ∈ x_full, x_i ∈ x_samples
+    K = np.zeros((s, M))
+    for i in range(s):
+        print(f"\tCalculating K sample:\t{str(i+1).rjust(len(str(s)))} / {s}\t({(i+1)/s:.0%})", end="\r")
+        x_samples_T_i = x_samples[i, :]
+        for j in range(M):
+            if i==0 and j==0:
+                print(x_full[j, :].shape, x_samples_T_i.shape, (x_full[j,:,np.newaxis]-x_samples_T_i[np.newaxis, :]).shape)
+
+            K[i, j] = k(x_full[j, :], x_samples_T_i)
+    print()
+    #print(f'Now solving y=Kα for α with K=\n{K[:,samples_indices]}')
+    # coefficients α with shape: (s,)
+    α = np.linalg.solve(K[:,samples_indices] + s*λ*np.eye(s), y_samples)       # with K[:,x_samples_indices] shape: (s, s)]
     return α @ K    # values of interpolation function with shape: (N,)

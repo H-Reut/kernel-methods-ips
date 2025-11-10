@@ -1,7 +1,7 @@
 ﻿import numpy as np
 import matplotlib.pyplot as plt
 import shared_functions
-import time
+
 
 ########## Parameters ##########
 # time
@@ -79,16 +79,9 @@ for i in range(len(s_values)):
     var_samples = x_var[t_samples_indices] + np.random.normal(0, 𝜎, size=s)    # shape: (s,)
     skw_samples = x_skw[t_samples_indices] + np.random.normal(0, 𝜎, size=s)    # shape: (s,)
 
-    K = shared_functions.k_γ_doubleSum(x[t_samples_indices, np.newaxis], x[np.newaxis, :])
-    alpha = np.linalg.solve(K[:,t_samples_indices], var_samples)
-    x_var_int = (alpha @ K)
-
-    x_var_int = shared_functions.interpolate(x, t_samples_indices, var_samples, lambda x, xʹ: shared_functions.k_γ_doubleSum(x, xʹ, γ), λ)
-
-
     # interpolation of x_var and x_skw
-    #x_var_int = shared_functions.interpolate(t, t_samples_indices, var_samples, lambda x, xʹ: shared_functions.k_γ(x, xʹ, γ), λ)
-    x_skw_int = shared_functions.interpolate(t, t_samples_indices, skw_samples, lambda x, xʹ: shared_functions.k_γ(x, xʹ, γ), λ)
+    x_var_int = shared_functions.interpolate(x, t_samples_indices, var_samples, lambda x, xʹ: shared_functions.k_γ_doubleSum(x, xʹ, γ), λ)
+    x_skw_int = shared_functions.interpolate(x, t_samples_indices, skw_samples, lambda x, xʹ: shared_functions.k_γ_doubleSum(x, xʹ, γ), λ)
 
     # errors
     err_var = np.abs(x_var - x_var_int)
@@ -146,4 +139,4 @@ for i in range(len(s_values)):
     plt.show()
 
 np.set_printoptions(linewidth=80)
-print(f'\nError table:\n  noise std dev |regulariz.para|   samples    |   L_inf_var  |   L_inf_skw  \n----------------+--------------+--------------+--------------+---------------\n{np.stack((𝜎_values, λ_values, s_values, L_inf_var, L_inf_skw)).transpose()}\n')
+print(f'\nError table:\n  noise std dev |regulariz.para|interp.samples|   L_inf_var  |   L_inf_skw  \n----------------+--------------+--------------+--------------+---------------\n{np.stack((𝜎_values, λ_values, s_values, L_inf_var, L_inf_skw)).transpose()}\n')

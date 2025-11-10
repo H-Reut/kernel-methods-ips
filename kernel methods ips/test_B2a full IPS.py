@@ -17,7 +17,7 @@ M_values = np.array([   10,  100, 1000,np.inf])     # number of agents
 
 # model parameters
 s_values = np.array([ 8   , 8   , 8   , 8  ])     # number of time samples
-γ_values = 10/np.sqrt(2) / np.array([1, 1, 1, 1])    # parameters of kernel k_γ
+γ_values = 1/np.sqrt(2)*np.array([1, 1, 1, 1])    # parameters of kernel k_γ
 𝜎_values = np.array([ 0.0 , 0.0 , 0.0 , 0.0])     # Add noise to the samples with normal distribution 𝒩(𝜇=0, 𝜎²) (𝜎: standard deviation)
 λ_values = np.array([ 0.0 , 0.0 , 0.0 , 0.0])     # regularization parameter λ for interpolation
 assert len(M_values) == len(s_values) == len(γ_values) == len(𝜎_values) == len(λ_values), "Parameter arrays must have the same length"
@@ -82,8 +82,13 @@ for i in range(len(s_values)):
     var_samples = x_var[t_samples_indices] + np.random.normal(0, 𝜎, size=s)    # shape: (s,)
     skw_samples = x_skw[t_samples_indices] + np.random.normal(0, 𝜎, size=s)    # shape: (s,)
     # interpolation of x_var and x_skw
-    x_var_int = shared_functions.interpolate(t, t_samples_indices, var_samples, lambda x, xʹ: shared_functions.k_γ(x, xʹ, γ), λ)
-    x_skw_int = shared_functions.interpolate(t, t_samples_indices, skw_samples, lambda x, xʹ: shared_functions.k_γ(x, xʹ, γ), λ)
+    time1 = time.time()
+    print('\tinterpolating variance...')
+    x_var_int = shared_functions.interpolate(x, t_samples_indices, var_samples, lambda x, xʹ: shared_functions.k_γ_doubleSum(x, xʹ, γ), λ)
+    print('\tinterpolating skewness...')
+    x_skw_int = shared_functions.interpolate(x, t_samples_indices, skw_samples, lambda x, xʹ: shared_functions.k_γ_doubleSum(x, xʹ, γ), λ)
+    time2 = time.time()
+    print(f'Interpolation time general:  {time2 - time1:.2f} seconds')
 
     # errors
     err_var = np.abs(x_var - x_var_int)
