@@ -1,7 +1,7 @@
 ﻿import numpy as np
 import matplotlib.pyplot as plt
 import shared_functions
-
+import time
 
 ########## Parameters ##########
 # time
@@ -21,7 +21,7 @@ print(f'Number of agents:\tM = {M}')
 x[0,:] = np.random.rand(M) + np.ones((M))   # random positions in interval [1,2]
 
 # model parameters
-γ_values = 10/np.sqrt(2) / np.array([1, 1, 1, 1])    # parameters of kernel k_γ
+γ_values = 1/np.sqrt(2) / np.array([1, 1, 1, 1])    # parameters of kernel k_γ
 
 # interpolation parameter
 s_values = np.array([ 2   , 4   , 8   , 4   ])  # number of time samples
@@ -73,11 +73,21 @@ for i in range(len(s_values)):
     # time samples for interpolation
     t_samples_indices = ((N-1)//(s-1)) * np.arange(0, s, 1)     # shape: (s,)
     t_samples = t[t_samples_indices]
+    x_samples = x[t_samples_indices, :]
+
     # introducing normal noise to the samples: 𝒩(𝜇=0, 𝜎²=0.0001)
     var_samples = x_var[t_samples_indices] + np.random.normal(0, 𝜎, size=s)    # shape: (s,)
     skw_samples = x_skw[t_samples_indices] + np.random.normal(0, 𝜎, size=s)    # shape: (s,)
+
+    K = shared_functions.k_γ_doubleSum(x[t_samples_indices, np.newaxis], x[np.newaxis, :])
+    alpha = np.linalg.solve(K[:,t_samples_indices], var_samples)
+    x_var_int = (alpha @ K)
+
+    x_var_int = shared_functions.interpolate(x, t_samples_indices, var_samples, lambda x, xʹ: shared_functions.k_γ_doubleSum(x, xʹ, γ), λ)
+
+
     # interpolation of x_var and x_skw
-    x_var_int = shared_functions.interpolate(t, t_samples_indices, var_samples, lambda x, xʹ: shared_functions.k_γ(x, xʹ, γ), λ)
+    #x_var_int = shared_functions.interpolate(t, t_samples_indices, var_samples, lambda x, xʹ: shared_functions.k_γ(x, xʹ, γ), λ)
     x_skw_int = shared_functions.interpolate(t, t_samples_indices, skw_samples, lambda x, xʹ: shared_functions.k_γ(x, xʹ, γ), λ)
 
     # errors
