@@ -21,12 +21,12 @@ print(f'Number of agents:\tM = {M}')
 x[0,:] = np.random.rand(M) + np.ones((M))   # random positions in interval [1,2]
 
 # model parameters
-γ_values = 1/np.sqrt(2) / np.array([1, 1, 1, 1])    # parameters of kernel k_γ
+γ_values = 1/np.sqrt(2) * np.array([1, 1, 1, 1])    # parameters of kernel k_γ
 
 # interpolation parameter
 s_values = np.array([ 2   , 4   , 8   , 4   ])  # number of time samples
 𝜎_values = np.array([ 0.0 , 0.0 , 0.0 , 0.01])  # Add noise to the samples with normal distribution 𝒩(𝜇=0, 𝜎²) (𝜎: standard deviation)
-λ_values = np.array([ 0.0 , 0.0 , 0.0 , 0.01])  # regularization parameter λ for interpolation
+λ_values = np.array([ 0.0 , 0.0 , 0.0 , 0.001])  # regularization parameter λ for interpolation
 
 
 # Interaction function P(x-xʹ) for opinion dynamics model

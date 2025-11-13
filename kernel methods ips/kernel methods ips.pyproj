@@ -4,7 +4,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>cb40c8c5-bf85-433e-a77f-4c5330ea1920</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>test_B2a full IPS.py</StartupFile>
+    <StartupFile>test_B2.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
@@ -26,8 +26,7 @@
     <Compile Include="test_A2.py" />
     <Compile Include="test_A1.py" />
     <Compile Include="test_B1.py" />
-    <Compile Include="test_B2b MonteCarlo IPS.py" />
-    <Compile Include="test_B2a full IPS.py" />
+    <Compile Include="test_B2.py" />
   </ItemGroup>
   <ItemGroup>
     <InterpreterReference Include="Global|PythonCore|3.13" />

@@ -33,33 +33,70 @@ def k_γ_doubleSum(x, xʹ, γ=1.0/np.sqrt(2)):
 
 
 
-def interpolate(x_full, samples_indices, y_samples, k, λ=0.0):
+def interpolate(x_full, x_samples_indices, y_samples, k, Mˆ=0, λ=0.0):
     """
     Performs kernel interpolation using the kernel function k.
     Returns the interpolated values at all time steps t_full.
-    - x_full: all time steps
-    - samples_indices: indices of sampled time steps in t_full
-    - y_samples: sampled values at t_full[t_samples_indices]
+    - x_full: full x-axis
+    - x_samples_indices: indices of sampled time steps in x_full
+    - y_samples: sampled values at t_full[t_x_samples_indices]
     - k: kernel function to compute the Kernel/Gram matrix K
-    - λ: optional regularization parameter (default 0)
+    - Mˆ: number of agents to use for interpolation. 
+          (Mˆ=0 or Mˆ=M: use all agents)
+    - λ: optional regularization parameter (0.0 = no regularization)
     """
-    x_samples = x_full[samples_indices]
+    x_samples = x_full[x_samples_indices]
     s = len(x_samples)
-    M = x_full.shape[0]
-    #print(f'\nIndices of samples:\tsamples_indices = {samples_indices}\nsamples:\tx_samples = {x_samples}\ny values at samples:\ty={y_samples}')
+    N, M = x_full.shape[0:2]
+    assert 0 <= Mˆ <= M, f"Mˆ ({Mˆ}) must be ≥0 and ≤M ({M})"
+    if Mˆ == 0:
+        Mˆ = M
+    agents_sample_indices = np.random.default_rng().choice(M, size=Mˆ, replace=False, shuffle=False)
+    #print(f'\nIndices of samples:\tx_samples_indices = {x_samples_indices}\nsamples:\tx_samples = {x_samples}\ny values at samples:\ty={y_samples}')
     # Kernel-matrix / Gram-matrix
     # K[i, j] = kernel_function(x_j, x_i), where x_j ∈ x_full, x_i ∈ x_samples
-    K = np.zeros((s, M))
+    K = np.zeros((s, N))
+    for i in range(s):
+        print(f"\tCalculating K sample:\t{str(i+1).rjust(len(str(s)))} / {s}\t({(i+1)/s:.0%})", end="\r")
+        x_samples_T_i = x_samples[i, agents_sample_indices]
+        for j in range(N):
+            K[i, j] = k(x_full[j, agents_sample_indices], x_samples_T_i)
+    print()
+    #print(f'Now solving y=Kα for α with K=\n{K[:,x_samples_indices]}')
+    # coefficients α with shape: (s,)
+    α = np.linalg.solve(K[:,x_samples_indices] + s*λ*np.eye(s), y_samples)       # with K[:,x_samples_indices] shape: (s, s)]
+    return α @ K    # values of interpolation function with shape: (N,)
+
+def interpolateNoMC(x_full, x_samples_indices, y_samples, k, Mˆ=0, λ=0.0):
+    """
+    Performs kernel interpolation using the kernel function k.
+    Returns the interpolated values at all time steps t_full.
+    - x_full: full x-axis
+    - x_samples_indices: indices of sampled time steps in x_full
+    - y_samples: sampled values at t_full[t_x_samples_indices]
+    - k: kernel function to compute the Kernel/Gram matrix K
+    - Mˆ: number of agents to use for interpolation. 
+          (Mˆ=0 or Mˆ=M: use all agents)
+    - λ: optional regularization parameter (0.0 = no regularization)
+    """
+    x_samples = x_full[x_samples_indices]
+    s = len(x_samples)
+    N, M = x_full.shape[0:2]
+    assert 0 <= Mˆ <= M, f"Mˆ ({Mˆ}) must be ≥0 and ≤M ({M})"
+    if Mˆ == 0:
+        Mˆ = M
+    #agents_sample_indices = np.random.default_rng().choice(M, size=Mˆ, replace=False, shuffle=False)
+    #print(f'\nIndices of samples:\tx_samples_indices = {x_samples_indices}\nsamples:\tx_samples = {x_samples}\ny values at samples:\ty={y_samples}')
+    # Kernel-matrix / Gram-matrix
+    # K[i, j] = kernel_function(x_j, x_i), where x_j ∈ x_full, x_i ∈ x_samples
+    K = np.zeros((s, N))
     for i in range(s):
         print(f"\tCalculating K sample:\t{str(i+1).rjust(len(str(s)))} / {s}\t({(i+1)/s:.0%})", end="\r")
         x_samples_T_i = x_samples[i, :]
-        for j in range(M):
-            if i==0 and j==0:
-                print(x_full[j, :].shape, x_samples_T_i.shape, (x_full[j,:,np.newaxis]-x_samples_T_i[np.newaxis, :]).shape)
-
+        for j in range(N):
             K[i, j] = k(x_full[j, :], x_samples_T_i)
     print()
-    #print(f'Now solving y=Kα for α with K=\n{K[:,samples_indices]}')
+    #print(f'Now solving y=Kα for α with K=\n{K[:,x_samples_indices]}')
     # coefficients α with shape: (s,)
-    α = np.linalg.solve(K[:,samples_indices] + s*λ*np.eye(s), y_samples)       # with K[:,x_samples_indices] shape: (s, s)]
+    α = np.linalg.solve(K[:,x_samples_indices] + s*λ*np.eye(s), y_samples)       # with K[:,x_samples_indices] shape: (s, s)]
     return α @ K    # values of interpolation function with shape: (N,)
