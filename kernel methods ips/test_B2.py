@@ -1,10 +1,9 @@
 ﻿import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
-#from numpy.random import f
 import shared_functions
 import time
-
+from scipy.stats import skew
 
 ########## Parameters ##########
 # time
@@ -15,14 +14,14 @@ N   = 1000                      # number of time steps
 t   = np.linspace(t_0, T, N)    # all time steps
 
 # agents
-M_values = np.array([   10,  100, 1000,10000])     # number of agents
-Mˆ_values= np.array([   10,  100, 1000,  100])     # sample size
+M_values = np.array([   10,  100, 1000,10000,10000])     # number of agents
+Mˆ_values= np.array([   10,  100, 1000,  100,  100])     # sample size
 
 # model parameters
-s_values = np.array([ 8   , 8   , 8   , 8  ])     # number of time samples
-γ_values = 1/np.sqrt(2)*np.array([1, 1, 1, 1])    # parameters of kernel k_γ
-𝜎_values = np.array([ 0.0 , 0.0 , 0.0 , 0.0])     # Add noise to the samples with normal distribution 𝒩(𝜇=0, 𝜎²) (𝜎: standard deviation)
-λ_values = np.array([ 0.0 , 0.0 , 0.0 , 0.0])     # regularization parameter λ for interpolation
+s_values = np.array([ 8   , 8   , 8   , 8   , 8   ])     # number of time samples
+γ_values = 1/np.sqrt(2)*np.array([1, 1, 1, 1, 1])    # parameters of kernel k_γ
+𝜎_values = np.array([ 0.0 , 0.0 , 0.0 , 0.0 , 0.01])     # Add noise to the samples with normal distribution 𝒩(𝜇=0, 𝜎²) (𝜎: standard deviation)
+λ_values = np.array([ 0.0 , 0.0 , 0.0 , 0.0 , 0.0001])    # regularization parameter λ for interpolation
 spacebins = 100                 # number of bins for space axis (x) in histogram (timebins are timesteps t)
 assert len(M_values) == len(Mˆ_values) == len(s_values) == len(γ_values) == len(𝜎_values) == len(λ_values), "Parameter arrays must have the same length"
 
@@ -89,7 +88,7 @@ for i in range(len(s_values)):
 
     # variance and skewness
     x_var = x.var(axis=1)
-    x_skw = skewness_from_paper(x)
+    x_skw = skew(x, axis=1)#skewness_from_paper(x)
 
     # time samples for interpolation
     samples_indices = ((N-1)//(s-1)) * np.arange(0, s, 1)     # shape: (s,)
@@ -185,6 +184,6 @@ for i in range(len(s_values)):
 print(f'\nError table:\n   M   |   Mˆ  |   s   |   γ   |noise SD|   L∞ var   |   L∞ skw   \n-------|-------|-------|-------|--------|------------|------------')
 for i in range(len(s_values)):
     λ = λ_values[i]
-    print(f'{M_values[i]:>6} |{Mˆ_values[i]:>6} |{s_values[i]:>4}   | {γ_values[i]:.3f} |{𝜎_values[i]:.2e}| {L_inf_var[i]:.4e} | {L_inf_skw[i]:.4e}')
+    print(f'{M_values[i]:>6} {f'|' if M_values[i]!=Mˆ_values[i] else ' '}{Mˆ_values[i]:>6} |{s_values[i]:>4}   | {γ_values[i]:.3f} |{f'{𝜎_values[i]:.2e}' if 𝜎_values[i] else '    0   '}| {L_inf_var[i]:.4e} | {L_inf_skw[i]:.4e}')
 #np.set_printoptions(linewidth=80)
 #print(f'\nError table:\n  noise std dev |regulariz.para|   samples    |   L_inf_var  |   L_inf_skw  \n----------------+--------------+--------------+--------------+---------------\n{np.stack((𝜎_values, λ_values, s_values, L_inf_var, L_inf_skw)).transpose()}\n')

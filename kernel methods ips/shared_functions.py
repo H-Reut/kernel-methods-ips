@@ -82,9 +82,9 @@ def interpolateNoMC(x_full, x_samples_indices, y_samples, k, Mˆ=0, λ=0.0):
     x_samples = x_full[x_samples_indices]
     s = len(x_samples)
     N, M = x_full.shape[0:2]
-    assert 0 <= Mˆ <= M, f"Mˆ ({Mˆ}) must be ≥0 and ≤M ({M})"
+    '''assert 0 <= Mˆ <= M, f"Mˆ ({Mˆ}) must be ≥0 and ≤M ({M})"
     if Mˆ == 0:
-        Mˆ = M
+        Mˆ = M'''
     #agents_sample_indices = np.random.default_rng().choice(M, size=Mˆ, replace=False, shuffle=False)
     #print(f'\nIndices of samples:\tx_samples_indices = {x_samples_indices}\nsamples:\tx_samples = {x_samples}\ny values at samples:\ty={y_samples}')
     # Kernel-matrix / Gram-matrix
