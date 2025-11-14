@@ -5,6 +5,13 @@ import shared_functions
 import time
 from scipy.stats import skew
 
+
+# repeatable randomness
+seed = 1047260852#np.random.randint(2147483647)
+print(f'test_B2.py\t\tseed:\t{seed}')
+rng = np.random.default_rng(seed=seed)
+
+
 ########## Parameters ##########
 # time
 t_0 =    0                      # start time
@@ -62,7 +69,7 @@ for i in range(len(s_values)):
     # positions and initial values
     print(f'\nParameters:\tM = {M}\n\t\tMˆ = {Mˆ}\n\t\ts = {s}\n\t\tγ = {γ}\n\t\tσ = {𝜎}\n\t\tλ = {λ}')
     x = np.zeros((N, M))
-    x[0,:] = np.random.rand(M) + np.ones((M))   # random positions in interval [1,2]
+    x[0,:] = rng.uniform(1.0, 2.0, M)   # random positions in interval [1,2]
 
     # solving
     time_start = time.time()
@@ -74,7 +81,7 @@ for i in range(len(s_values)):
             x[n+1] = x[n] + (Δt/M) * np.sum(P(diffx) * diffx, 1)     # x[n+1] shape: (M,)
         else:
             # taking sample of x of size Mˆ
-            sample = np.random.default_rng().choice(x[n, :], size=Mˆ, replace=False, shuffle=False)  # shape: (Mˆ,)
+            sample = rng.choice(x[n, :], size=Mˆ, replace=False, shuffle=False)  # shape: (Mˆ,)
             P_x_s = P(x[n,:,np.newaxis] - sample[:])    # P_x_s[i,j] = P(x_i, x_i_j) where x_i is ith agent, x_i_j is jth sampled agent.  shape: (M, Mˆ)
             Pi = 1/Mˆ * np.sum(P_x_s, 1)    # Pi[i] = 1/Mˆ * Σⱼ P(x_i, x_i_j)   shape: (M,)
             Xi = 1/Mˆ * np.sum(P_x_s / Pi[:, np.newaxis] * sample[np.newaxis, :], 1)    # Xi[i] = 1/Mˆ * Σⱼ P(x_i, x_i_j)/Pi[i] * x_i_j   shape: (M,)
@@ -88,20 +95,20 @@ for i in range(len(s_values)):
 
     # variance and skewness
     x_var = x.var(axis=1)
-    x_skw = skew(x, axis=1)#skewness_from_paper(x)
+    x_skw = skewness_from_paper(x) # skew(x, axis=1) # 
 
     # time samples for interpolation
     samples_indices = ((N-1)//(s-1)) * np.arange(0, s, 1)     # shape: (s,)
     t_samples = t[samples_indices]
     # introducing normal noise to the samples: 𝒩(𝜇=0, 𝜎²=0.0001)
-    var_samples = x_var[samples_indices] + np.random.normal(0, 𝜎, size=s)    # shape: (s,)
-    skw_samples = x_skw[samples_indices] + np.random.normal(0, 𝜎, size=s)    # shape: (s,)
+    var_samples = x_var[samples_indices] + rng.normal(0, 𝜎, size=s)    # shape: (s,)
+    skw_samples = x_skw[samples_indices] + rng.normal(0, 𝜎, size=s)    # shape: (s,)
     # interpolation of x_var and x_skw
     time1 = time.time()
     print('interpolating variance…')
-    x_var_int = shared_functions.interpolate(x, samples_indices, var_samples, lambda x, xʹ: shared_functions.k_γ_doubleSum(x, xʹ, γ), Mˆ, λ)
+    x_var_int = shared_functions.interpolate(x, samples_indices, var_samples, lambda x, xʹ: shared_functions.k_γ_doubleSum(x, xʹ, γ), λ, Mˆ)
     print('interpolating skewness…')
-    x_skw_int = shared_functions.interpolate(x, samples_indices, skw_samples, lambda x, xʹ: shared_functions.k_γ_doubleSum(x, xʹ, γ), Mˆ, λ)
+    x_skw_int = shared_functions.interpolate(x, samples_indices, skw_samples, lambda x, xʹ: shared_functions.k_γ_doubleSum(x, xʹ, γ), λ, Mˆ)
     time2 = time.time()
     print(f'\tInterpolation time:  {time2 - time1:.2f} seconds')
 
@@ -184,6 +191,6 @@ for i in range(len(s_values)):
 print(f'\nError table:\n   M   |   Mˆ  |   s   |   γ   |noise SD|   L∞ var   |   L∞ skw   \n-------|-------|-------|-------|--------|------------|------------')
 for i in range(len(s_values)):
     λ = λ_values[i]
-    print(f'{M_values[i]:>6} {f'|' if M_values[i]!=Mˆ_values[i] else ' '}{Mˆ_values[i]:>6} |{s_values[i]:>4}   | {γ_values[i]:.3f} |{f'{𝜎_values[i]:.2e}' if 𝜎_values[i] else '    0   '}| {L_inf_var[i]:.4e} | {L_inf_skw[i]:.4e}')
+    print(f'{M_values[i]:>6} {f'|' if M_values[i]!=Mˆ_values[i] else '='}{Mˆ_values[i]:>6} |{s_values[i]:>4}   | {γ_values[i]:.3f} |{f'{𝜎_values[i]:.2e}' if 𝜎_values[i] else '    0   '}| {L_inf_var[i]:.4e} | {L_inf_skw[i]:.4e}')
 #np.set_printoptions(linewidth=80)
 #print(f'\nError table:\n  noise std dev |regulariz.para|   samples    |   L_inf_var  |   L_inf_skw  \n----------------+--------------+--------------+--------------+---------------\n{np.stack((𝜎_values, λ_values, s_values, L_inf_var, L_inf_skw)).transpose()}\n')

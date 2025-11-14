@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 import shared_functions
 
 # repeatable randomness
-seed = np.random.randint(2147483647)
-print(f'test_A1.py\t\tseed:\t{seed}')
+seed = 2025#np.random.randint(2147483647)
+print(f'test_B3.py\t\tseed:\t{seed}')
 rng = np.random.default_rng(seed=seed)
 
 
@@ -19,13 +19,12 @@ print(f'Time interval:\tt_0 = {t_0}\t\tT = {T}\nTime steps:\tN = {N}')
 
 # agents
 M   = 30                        # number of agents
-x   = np.zeros((N,M))           # positions
+x   = np.zeros((N,M,2))           # positions
 v   = np.zeros((N,M))           # velocities
 print(f'Number of agents:\tM = {M}')
 
 # initial values
-x[0,:] = rng.uniform(1.0, 2.0, M)   # random positions  in interval [1,2]
-v[0,:] = rng.uniform(1.0, 2.0, M)   # random velocities in interval [1,2]
+x[0, :, :] = rng.uniform(1.0, 2.0, (M, 2))   # random positions  in interval [1,2]
 
 # model parameters
 β = 2.0             # parameter of H_β
@@ -43,56 +42,45 @@ def H_β(diff, β=2.0):
 
 
 ########## Solving positions (x) and velocities (v) ##########
-# iterative solver (slower)
-'''for n in range(N-1):
-    print(f"\tsolving time step:\t{str(n+1).rjust(len(str(N-1)))} / {N-1}\t({(n+1)/(N-1):.0%})", end="\r")
-    # solving x
-    x[n+1,:] = x[n,:] + Δt*v[n,:]
-    # solving v
-    for i in range(M):
-        sum = 0.0
-        for j in range(M):
-            sum += H_β(x[n,i] - x[n,j]) * (v[n,j] - v[n,i])
-        v[n+1,i] = v[n,i] + (Δt/M)*sum 
-print()'''
-
 # numpy solver (faster)
 for n in range(N-1):
     print(f"\tsolving time step:\t{str(n+1).rjust(len(str(N-1)))} / {N-1}\t({(n+1)/(N-1):.0%})", end="\r")
     # solving x
-    x[n+1,:] = x[n,:] + Δt*v[n,:]       # x[n+1,:] shape: (M,)
+    x[n+1, :, 0] = x[n, :, 0] + Δt*x[n, :, 1]       # x[n+1,:] shape: (M,)
     # solving v
-    diffx = x[n,:,np.newaxis] - x[n,:]  # diffx[i,j] = x_i-x_j    diffx shape: (M, M)
-    diffv = v[n,:] - v[n,:,np.newaxis]  # diffv[i,j] = v_j-v_i    diffv shape: (M, M)
-    v[n+1,:] = v[n,:] + (Δt/M) * np.sum(H_β(diffx, β) * diffv, 1)     # v[n+1] shape: (M,)
+    diffx = x[n, :, 0, np.newaxis] - x[n, :, 0]  # diffx[i,j] = x_i-x_j    diffx shape: (M, M)
+    diffv = x[n, :, 1] - x[n, :, 1, np.newaxis]  # diffv[i,j] = v_j-v_i    diffv shape: (M, M)
+    x[n+1, :, 1] = x[n, :, 1] + (Δt/M) * np.sum(H_β(diffx, β) * diffv, 1)     # v[n+1] shape: (M,)
 print()
 
+fig, axs = plt.subplots(2, 1)
 
 # Plotting positions (x) over time (t)
-plt.plot(t, x)
-plt.gca().set_xlim(t_0, T)  # set x-axis to interval [t_0, T]
-plt.title("Positions")
-plt.xlabel("$t$")
-plt.ylabel("$x$")
-plt.show()
+axs[0].plot(t, x[:, :, 0])
+axs[0].set_xlim(t_0, T)  # set x-axis to interval [t_0, T]
+axs[0].set_title("Positions")
+axs[0].set_xlabel("$t$")
+axs[0].set_ylabel("$x$")
 
 # Plotting velocities (v) over time (t)
-plt.plot(t, v)
-plt.gca().set_xlim(t_0, T)  # set x-axis to interval [t_0, T]
-plt.title("Velocities")
-plt.xlabel("$t$")
-plt.ylabel("$v$")
+axs[1].plot(t, x[:, :, 1])
+axs[1].set_xlim(t_0, T)  # set x-axis to interval [t_0, T]
+axs[1].set_title("Velocities")
+axs[1].set_xlabel("$t$")
+axs[1].set_ylabel("$v$")
+
 plt.show()
 
 
 ########## Variance of v and interpolation ##########
-v_var = v.var(axis=1)
+v_var = x[:, :, 1].var(axis=1)
+
 
 # interpolation of v_var
-t_samples_indices = ((N-1)//(s-1)) * np.arange(0, s, 1)
-t_samples = t[t_samples_indices]
-y = v_var[t_samples_indices]
-v_var_int = shared_functions.interpolate(t, t_samples_indices, y, lambda x, xʹ: shared_functions.k_γ(x, xʹ, γ))
+samples_indices = ((N-1)//(s-1)) * np.arange(0, s, 1)
+t_samples = t[samples_indices]
+y = v_var[samples_indices]
+v_var_int = shared_functions.interpolate(x[:, :, 1], samples_indices, y, lambda x, xʹ: shared_functions.k_γ_doubleSum(x, xʹ, γ))
 
 # Plotting Variance of velocities (v_var) and interpolation (v_var_int) over time (t)
 plt.plot(t, v_var, label="true variance $\\mathcal{V}_M$")
@@ -110,11 +98,7 @@ err = np.abs(v_var - v_var_int)
 
 # Plotting:
 plt.semilogy(t, err, '.', label="error")
-'''locations, labels = plt.xticks()
-plt.xticks(t_samples, minor=False)
-plt.grid(True, which='major', axis='x')
-plt.xticks(locations, labels=locations, minor=True)'''
-plt.plot(t_samples, err[t_samples_indices], marker='o', markeredgecolor='r', fillstyle='none', linestyle=' ', label="known data points")
+plt.plot(t_samples, err[samples_indices], marker='o', markeredgecolor='r', fillstyle='none', linestyle=' ', label="known data points")
 plt.gca().set_xlim(t_0, T)  # set x-axis to interval [t_0, T]
 plt.title("Error")
 plt.legend()

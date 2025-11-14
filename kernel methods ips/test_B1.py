@@ -2,6 +2,11 @@
 import matplotlib.pyplot as plt
 import shared_functions
 
+# repeatable randomness
+seed = np.random.randint(2147483647)
+print(f'test_B1.py\t\tseed:\t{seed}')
+rng = np.random.default_rng(seed=seed)
+
 
 ########## Parameters ##########
 # time
@@ -18,7 +23,7 @@ x   = np.zeros((N,M))           # positions
 print(f'Number of agents:\tM = {M}')
 
 # initial values
-x[0,:] = np.random.rand(M) + np.ones((M))   # random positions in interval [1,2]
+x[0,:] = rng.uniform(1.0, 2.0, M)   # random positions in interval [1,2]
 
 # model parameters
 γ_values = 1/np.sqrt(2) * np.array([1, 1, 1, 1])    # parameters of kernel k_γ
@@ -76,12 +81,12 @@ for i in range(len(s_values)):
     x_samples = x[t_samples_indices, :]
 
     # introducing normal noise to the samples: 𝒩(𝜇=0, 𝜎²=0.0001)
-    var_samples = x_var[t_samples_indices] + np.random.normal(0, 𝜎, size=s)    # shape: (s,)
-    skw_samples = x_skw[t_samples_indices] + np.random.normal(0, 𝜎, size=s)    # shape: (s,)
+    var_samples = x_var[t_samples_indices] + rng.normal(0, 𝜎, size=s)    # shape: (s,)
+    skw_samples = x_skw[t_samples_indices] + rng.normal(0, 𝜎, size=s)    # shape: (s,)
 
     # interpolation of x_var and x_skw
-    x_var_int = shared_functions.interpolate(x, t_samples_indices, var_samples, lambda x, xʹ: shared_functions.k_γ_doubleSum(x, xʹ, γ), λ)
-    x_skw_int = shared_functions.interpolate(x, t_samples_indices, skw_samples, lambda x, xʹ: shared_functions.k_γ_doubleSum(x, xʹ, γ), λ)
+    x_var_int = shared_functions.interpolate(x, t_samples_indices, var_samples, lambda x, xʹ: shared_functions.k_γ_doubleSum(x, xʹ, γ), λ, 0)
+    x_skw_int = shared_functions.interpolate(x, t_samples_indices, skw_samples, lambda x, xʹ: shared_functions.k_γ_doubleSum(x, xʹ, γ), λ, 0)
 
     # errors
     err_var = np.abs(x_var - x_var_int)

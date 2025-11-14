@@ -4,7 +4,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>cb40c8c5-bf85-433e-a77f-4c5330ea1920</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>test_B2.py</StartupFile>
+    <StartupFile>test_B3.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
@@ -12,6 +12,7 @@
     <Name>kernel methods ips</Name>
     <RootNamespace>kernel methods ips</RootNamespace>
     <InterpreterId>Global|PythonCore|3.13</InterpreterId>
+    <TestFramework>Pytest</TestFramework>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>
@@ -27,6 +28,7 @@
     <Compile Include="test_A1.py" />
     <Compile Include="test_B1.py" />
     <Compile Include="test_B2.py" />
+    <Compile Include="test_B3.py" />
   </ItemGroup>
   <ItemGroup>
     <InterpreterReference Include="Global|PythonCore|3.13" />

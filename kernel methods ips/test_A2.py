@@ -2,6 +2,11 @@
 import matplotlib.pyplot as plt
 import shared_functions
 
+# repeatable randomness
+seed = np.random.randint(2147483647)
+print(f'test_A2.py\t\tseed:\t{seed}')
+rng = np.random.default_rng(seed=seed)
+
 
 ########## Parameters ##########
 # time
@@ -19,8 +24,8 @@ v   = np.zeros((N,M))           # velocities
 print(f'Number of agents:\tM = {M}')
 
 # initial values
-x[0,:] = np.random.rand(M) + np.ones((M))   # random positions  in interval [1,2]
-v[0,:] = np.random.rand(M) + np.ones((M))   # random velocities in interval [1,2]
+x[0,:] = rng.uniform(1.0, 2.0, M)   # random positions  in interval [1,2]
+v[0,:] = rng.uniform(1.0, 2.0, M)   # random velocities in interval [1,2]
 
 # model parameter
 β_N = 101               # Number of different values for β
@@ -80,7 +85,6 @@ plt.plot(β_values, J_values, label="$\\mathcal{J}$")
 plt.plot(β_values, J_int, 'r--', label="$\\mathcal{\\hat{J}}$")
 plt.plot(β_samples, y, marker='o', markeredgecolor='orange', fillstyle='none', linestyle=' ', label="known data points")
 #plt.gca().set_ylim(0, None)  # set y-axis bottom to 0
-plt.gca().set_xlim(t_0, T)  # set x-axis to interval [t_0, T]
 plt.title("Velocities variance")
 plt.xlabel("$\\beta$")
 plt.legend()
@@ -97,7 +101,6 @@ plt.xticks(β_samples, minor=False)
 plt.grid(True, which='major', axis='x')
 plt.xticks(locations, labels=locations, minor=True)'''
 plt.plot(β_samples, err[β_samples_indices], marker='o', markeredgecolor='r', fillstyle='none', linestyle=' ', label="known data points")
-plt.gca().set_xlim(t_0, T)  # set x-axis to interval [t_0, T]
 plt.title("Error")
 plt.legend()
 plt.show()
