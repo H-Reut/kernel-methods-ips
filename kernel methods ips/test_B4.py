@@ -81,17 +81,58 @@ def H_β(diff, β=2.0):
     return 1 / (1 + np.abs(diff)**2)**β
 
 
+
+def max_(μ_t):
+    flat_index = np.argmax(μ_t)
+    ij_max = np.unravel_index(flat_index, μ_t.shape)
+    return ij_max / np.array([N_x, N_v]) * np.array([x_end-x_start, v_end-v_start])
+
+
+def mean(μ_t):
+    # create grid of (x, v) pairs: xv[i, j] = [x[i], v[j]]
+    X, V = np.meshgrid(x, v, indexing='ij')  # X, V shapes: (N_x, N_v)
+    xv = np.stack((X, V), axis=-1)           # xv shape: (N_x, N_v, 2)
+    #print(xv)
+    print(np.sum(xv * μ_t[..., np.newaxis], axis=(0, 1)) * intFac)
+    return np.sum(xv * μ_t[..., np.newaxis], axis=(0, 1)) * intFac
+
+
+def variance(μ_t):
+    # create grid of (x, v) pairs: xv[i, j] = [x[i], v[j]]
+    X, V = np.meshgrid(x, v, indexing='ij')  # X, V shapes: (N_x, N_v)
+    xv = np.stack((X, V), axis=-1)           # xv shape: (N_x, N_v, 2)
+    mean_μ_t = mean(μ_t)
+    integral = np.linalg.norm(xv - mean_μ_t[np.newaxis, np.newaxis, :], axis=(-1))**2 * μ_t
+    print(integral.sum() * intFac)
+    return integral.sum() * intFac
+
+
+def skewness(μ_t):
+    # create grid of (x, v) pairs: xv[i, j] = [x[i], v[j]]
+    X, V = np.meshgrid(x, v, indexing='ij')  # X, V shapes: (N_x, N_v)
+    xv = np.stack((X, V), axis=-1)           # xv shape: (N_x, N_v, 2)
+    mean_μ_t = mean(μ_t)
+    var_μ_t = variance(μ_t)
+
+
 # plotting μ as 2d heatmap:
-
-
 def plot(μ, t_index):
     plt.imshow(μ[t_index, :, :], extent=[v_start, v_end, x_start, x_end], aspect='auto', origin='lower')
-    #plt.plot(np.array([0.5, 1, 1.5, 2, 2.5]), np.array([1, 2, 1.4, 1.6, 1.5]), marker='o', markeredgecolor='white', fillstyle='none', linestyle=' ', label="particles from IPS")
+
+    '''max_μ = (max_(μ[t_index]))[::-1]
+    mean_μ = (mean(μ[t_index]))[::-1]
+    var_μ = variance(μ[t_index])
+    plt.plot(*max_μ, 'kx', fillstyle='none', label='max')
+    plt.plot(*mean_μ, 'r+', fillstyle='none', label='mean')
+    var_circle = plt.Circle(mean_μ, var_μ, color='r', fill=False, label='variance')
+    plt.gca().add_patch(var_circle)'''
+
     plt.xlabel('velocity $v$')
     plt.ylabel('position $x$')
     plt.title(f'$\\mu(t,x,v)$ at time $t={t[t_index]:.3f}$, timestep: {t_index}, mass: {np.sum(μ[0])*intFac}')
     #plt.colorbar(label='$\\mu$ value')
-    #plt.gca().set_aspect('equal')
+    plt.gca().set_aspect('equal')
+    #plt.legend()    
     plt.show()
 
 
@@ -200,35 +241,35 @@ def hNpLoopLoop2():
 
 
 
-start_time = time.time()
 
-Δt2Δx = Δt / (2 * Δx)
-Δt2Δv = Δt / (2 * Δv)
-#H1 = H_β(x[:, np.newaxis] - x[np.newaxis, :])
-#wv = v[:, np.newaxis] - v[np.newaxis, :]
-hfunc = hLoop1b3#hNpLoopLoop2
+hfunc = hLoop1b3
 print(f'Function used for calculating h:\t{hfunc.__name__}')
+
 h_ij = np.zeros((N_x, N_v))
 # pseudo-code: H_β_y_x_i[i] = [H_β(y-x[i]) for all y in position-domain]
 H_β_y_x_i = H_β(np.lib.stride_tricks.sliding_window_view(y_x, N_x))[::-1]
 # pseudo-code: w_v_j[j] = [(w-v[j]) for all w in velocity-domain]
 w_v_j = np.lib.stride_tricks.sliding_window_view(w_v, N_v)[::-1]
 
+
+
+start_time = time.time()
 for n in range(N_t-1):
-    if n == 100:#n%100 == 0:
-        plot(μ, n)
     print(f"\tsolving time step:\t{str(n+1).rjust(len(str(N_t-1)))} / {N_t-1}\t({(n+1)/(N_t-1):.0%})\tmass: {np.sum(μ[0])*intFac}", end="\r")
-    if n==50:
-        print(
-            f"\nTime elapsed after 50 steps: {time.time() - start_time:.2f} seconds")
 
-    μn_LF = (μ[n, 0:-2, 1:-1] + μ[n, 2:, 1:-1] + μ[n, 1:-1, 0:-2] + μ[n, 1:-1, 2:]) / 4
-    g = Δt2Δx * (v[1:-1][np.newaxis, :] * (μ[n, 2:, 1:-1] - μ[n, 0:-2, 1:-1]))
-    μ[n+1, 1:-1, 1:-1] = μn_LF - g
+    #if n%100 == 0:
+    if n == 0 or n == 100:
+        plot(μ, n)
+    if n == 50:
+        print(f"\nTime elapsed after 50 steps: {time.time() - start_time:.2f} seconds")
+    
+    
+    μn_LF = (μ[n, 0:-2, 1:-1] + μ[n, 2:, 1:-1] + μ[n, 1:-1, 0:-2] + μ[n, 1:-1, 2:]) / 4 # Lax-Friedrich
+    g = v[np.newaxis, 1:-1] * (μ[n, 2:, 1:-1] - μ[n, 0:-2, 1:-1]) # g_i+1,j - g_i-1,j
+    h = intFac * hfunc() # h_i,j
+    μ[n+1, 1:-1, 1:-1] = μn_LF - (Δt/(2*Δx))*g - (Δt/(2*Δv))*(h[1:-1, 2:] - h[1:-1, :-2])
 
-    h = hfunc()
-
-    μ[n+1, 1:-1, 1:-1] -= Δt2Δv * intFac * (h[1:-1, 2:] - h[1:-1, :-2])
+    # boundary conditions: 0 outwards normal derivative
     μ[n+1,0] = μ[n+1,1].copy()
     μ[n+1,N_x-1] = μ[n+1,N_x-2].copy()
     μ[n+1,:,0] = μ[n+1,:,1].copy()
