@@ -11,6 +11,7 @@ seed = np.random.randint(2147483647)
 print(f'test_B1.py\t\tseed:\t{seed}')
 rng = np.random.default_rng(seed=seed)
 
+np.set_printoptions(linewidth=250)
 
 ########## Parameters ##########
 # time dimension
@@ -57,6 +58,11 @@ intFac  = A/N_x/N_v
 μ[0, 33:66, 66] = 1/3*np.ones(33)
 μ[0, 66, 33:66] = 1/3*np.ones(33)
 μ[0, 66, 66] = 1/9
+
+'''μ[0, 3:6, 3:6] = np.ones((3, 3))
+μ[0, 3:6, 6] = 1/3*np.ones(3)
+μ[0, 6, 3:6] = 1/3*np.ones(3)
+μ[0, 6, 6] = 1/9'''
 print(f'mass in μ:\t∫∫ μ(x,v) dx dv = {np.sum(μ[0])*intFac}')
 
 
@@ -80,6 +86,7 @@ def H_β(diff, β=2.0):
 
 def plot(μ, t_index):
     plt.imshow(μ[t_index, :, :], extent=[v_start, v_end, x_start, x_end], aspect='auto', origin='lower')
+    #plt.plot(np.array([0.5, 1, 1.5, 2, 2.5]), np.array([1, 2, 1.4, 1.6, 1.5]), marker='o', markeredgecolor='white', fillstyle='none', linestyle=' ', label="particles from IPS")
     plt.xlabel('velocity $v$')
     plt.ylabel('position $x$')
     plt.title(f'$\\mu(t,x,v)$ at time $t={t[t_index]:.3f}$, timestep: {t_index}, mass: {np.sum(μ[0])*intFac}')
@@ -89,44 +96,139 @@ def plot(μ, t_index):
 
 
 ########## Solving positions (x) and velocities (v) ##########
+# toDo: parallelize even more such that the i- and j- loops only contain
+# a single statement, e.g.:  h_ij[i, j] = A[i:i+N, j:j+N].sum()
+# runtime of current implementation with N_x=N_v=N_t=1000 is ~30 days
+def hLoop1():
+    h_ij = np.zeros((N_x, N_v))#(N_x-2, N_v))
+    for i in range(N_x):#(1, N_x-1):
+        h_yx  = y_x[N_x-1-i : N_x+N_x-1-i]
+        h_H_β = H_β(h_yx)[:,np.newaxis] * μ[n]
+        for j in range(0, N_v):
+            #h_ij[i-1, j] = (h_H_β * w_v[N_v-1-j : N_v+N_v-1-j]).sum()
+            h_ij[i, j] = (h_H_β * w_v[N_v-1-j : N_v+N_v-1-j]).sum()
+    h = h_ij[:] * μ[n, :, :]#μ[n, 1:-1, :]
+    return h
+
+def hLoop1b():
+    h_ij = np.zeros((N_x, N_v))
+    y_x_i = np.lib.stride_tricks.sliding_window_view(y_x, N_x)[::-1]
+    h_yx_i= H_β(np.lib.stride_tricks.sliding_window_view(y_x, N_x))[::-1]
+    w_v_j = np.lib.stride_tricks.sliding_window_view(w_v, N_v)[::-1]
+    for i in range(N_x):
+        h_H_β = H_β(y_x_i[i])[:,np.newaxis] * μ[n]
+        for j in range(0, N_v):
+            h_ij[i, j] = (h_H_β * w_v_j[j]).sum()
+    h = h_ij[:] * μ[n, :, :]
+    return h
+
+def hLoop1b2():
+    for i in range(N_x):
+        h_H_β = H_β_y_x_i[i,:,np.newaxis] * μ[n]
+        for j in range(0, N_v):
+            h_ij[i, j] = (h_H_β * w_v_j[j]).sum(axis=(-2, -1))
+    h = h_ij[:, :] * μ[n, :, :]
+    return h
+
+def hLoop1b3(): # fastest so far
+    h_H_β = H_β_y_x_i[:,:,np.newaxis] * μ[np.newaxis, n, :, :]
+    for i in range(N_x):
+        for j in range(0, N_v):
+            h_ij[i, j] = (h_H_β[i] * w_v_j[j]).sum(axis=(-2, -1))
+    h = h_ij[:, :] * μ[n, :, :]
+    return h
+
+def hLoop1c():
+    h_ij = np.zeros((N_x, N_v))
+    h_yx_i = np.lib.stride_tricks.sliding_window_view(y_x, N_x)[::-1]
+    w_v_j = np.lib.stride_tricks.sliding_window_view(w_v, N_v)[::-1]
+    for i in range(N_x):
+        h_H_β = H_β(h_yx_i[i])[:,np.newaxis] * μ[n]
+        h_ij[i, :] = (h_H_β[np.newaxis, :, :] * w_v_j[:, np.newaxis, :]).sum(axis=(-1, -2))
+    h = h_ij[:] * μ[n, :, :]
+    return h
+
+def hLoop2():
+    h_ij = np.zeros((N_x, N_v))
+    H_β_yx = H_β(y_x)[:,np.newaxis] 
+    for i in range(N_x):
+        h_H_β = H_β_yx[N_x-1-i : N_x+N_x-1-i] * w_v[np.newaxis, :]
+        for j in range(0, N_v):
+            h_ij[i, j] = (h_H_β[:, N_v-1-j : N_v+N_v-1-j] * μ[n]).sum()
+    h = (h_ij[:] * μ[n, :, :])
+    return h
+
+def hNpArrArr():
+    H_β_ij = H_β(y_x)[:,np.newaxis] * w_v
+    Integrand = np.lib.stride_tricks.sliding_window_view(H_β_ij, (N_x, N_v))
+    Integral = (Integrand * μ[n, np.newaxis, np.newaxis, :, :]).sum(axis=(-1, -2))
+    h = Integral[::-1, ::-1] * μ[n]
+    return h
+
+def hNpLoopArr():
+    H_β_ij = H_β(y_x)[:,np.newaxis] * w_v
+    Integrand = np.lib.stride_tricks.sliding_window_view(H_β_ij, (N_x, N_v))
+    Integral = np.zeros((N_x, N_v))
+    for i in range(N_x-1):
+        Integral[i,:] = (Integrand[i,:] * μ[n, np.newaxis, :, :]).sum(axis=(-1, -2))
+    h = Integral[::-1, ::-1] * μ[n]
+    return h
+
+def hNpLoopLoop():
+    H_β_ij = H_β(y_x)[:,np.newaxis] * w_v
+    Integrand = np.lib.stride_tricks.sliding_window_view(H_β_ij, (N_x, N_v))
+    Integral = np.zeros((N_x, N_v))
+    for i in range(N_x-1):
+        for j in range(N_v-1):
+            Integral[i,j] = (Integrand[i,j] * μ[n, :, :]).sum(axis=(-1, -2))
+    h = Integral[::-1, ::-1] * μ[n]
+    return h
+
+def hNpLoopLoop2():
+    H_β_ij = H_β(y_x)[:,np.newaxis] * w_v
+    Integrand = np.lib.stride_tricks.sliding_window_view(H_β_ij, (N_x, N_v))#
+    Integral = np.zeros((N_x, N_v))
+    for i in range(N_x-1):
+        for j in range(N_v-1):
+            Integral[-i-1,-j-1] = (H_β_ij[N_x-i-1 : 2*N_x-i-1 , N_v-j-1 : 2*N_v-j-1] * μ[n, :, :]).sum(axis=(-1, -2))
+            print('\n\n')
+            print(H_β_ij[N_x-i-1 : 2*N_x-i-1 , N_v-j-1 : 2*N_v-j-1])
+            print(Integrand[-i-1,-j-1])
+            assert (Integrand[-i-1,-j-1] * μ[n, :, :]).sum(axis=(-1, -2)) == Integral[i,j]
+    h = Integral[::-1, ::-1] * μ[n]
+    return h
+
+
+
 start_time = time.time()
 
 Δt2Δx = Δt / (2 * Δx)
 Δt2Δv = Δt / (2 * Δv)
 #H1 = H_β(x[:, np.newaxis] - x[np.newaxis, :])
 #wv = v[:, np.newaxis] - v[np.newaxis, :]
+hfunc = hLoop1b3#hNpLoopLoop2
+print(f'Function used for calculating h:\t{hfunc.__name__}')
+h_ij = np.zeros((N_x, N_v))
+# pseudo-code: H_β_y_x_i[i] = [H_β(y-x[i]) for all y in position-domain]
+H_β_y_x_i = H_β(np.lib.stride_tricks.sliding_window_view(y_x, N_x))[::-1]
+# pseudo-code: w_v_j[j] = [(w-v[j]) for all w in velocity-domain]
+w_v_j = np.lib.stride_tricks.sliding_window_view(w_v, N_v)[::-1]
+
 for n in range(N_t-1):
     if n == 100:#n%100 == 0:
         plot(μ, n)
-    print(f"\tsolving time step:\t{str(n+1).rjust(len(str(N_t-1)))} / {N_t-1}\t({(n+1)/(N_t-1):.0%})", end="\r")
+    print(f"\tsolving time step:\t{str(n+1).rjust(len(str(N_t-1)))} / {N_t-1}\t({(n+1)/(N_t-1):.0%})\tmass: {np.sum(μ[0])*intFac}", end="\r")
     if n==50:
         print(
             f"\nTime elapsed after 50 steps: {time.time() - start_time:.2f} seconds")
-    #h_n = np.zeros((N_x, N_v))
-    #def h(x, v):
-    #    print(x.shape)
-    #    diffx = x[np.newaxis, :] - x[:]
-    #    print(diffx.shape)
-    #    #temp = H_β(
-    
-    # solving μ
-    a = (μ[n, 0:-2, 1:-1] + μ[n, 2:, 1:-1] + μ[n, 1:-1, 0:-2] + μ[n, 1:-1, 2:]) / 4
-    b = Δt2Δx * (v[1:-1][np.newaxis, :] * (μ[n, 2:, 1:-1] - μ[n, 0:-2, 1:-1]))
-    μ[n+1, 1:-1, 1:-1] = a - b
-    h_ij = np.zeros((N_x-2, N_v))
-#    h_M1 = np.zeros((N_x-2, N_v))
-    for i in range(1, N_x-1):
-        #print(i)
-        h_yx  = y_x[N_x-1-i : N_x+N_x-1-i]
-        h_H_β = H_β(h_yx)[:,np.newaxis] * μ[n]
-        for j in range(0, N_v):
-            h_ij[i-1, j] = (h_H_β * w_v[N_v-1-j : N_v+N_v-1-j]).sum()
-            # toDo: parallelize even more such that the i- and j- loops only contain
-            # a single statement, e.g.:  h_ij[i, j] = A[i:i+N, j:j+N].sum()
-            # perhaps use np.cumsum() or other form of rolling sum
-            # runtime of current implementation with N_x=N_v=N_t=1000 is ~30 days
-    h2 = h_ij[:] * μ[n, 1:-1, :]
-    μ[n+1, 1:-1, 1:-1] -= Δt2Δv * intFac * (h2[:, 2:] - h2[:, :-2])
+
+    μn_LF = (μ[n, 0:-2, 1:-1] + μ[n, 2:, 1:-1] + μ[n, 1:-1, 0:-2] + μ[n, 1:-1, 2:]) / 4
+    g = Δt2Δx * (v[1:-1][np.newaxis, :] * (μ[n, 2:, 1:-1] - μ[n, 0:-2, 1:-1]))
+    μ[n+1, 1:-1, 1:-1] = μn_LF - g
+
+    h = hfunc()
+
+    μ[n+1, 1:-1, 1:-1] -= Δt2Δv * intFac * (h[1:-1, 2:] - h[1:-1, :-2])
     μ[n+1,0] = μ[n+1,1].copy()
     μ[n+1,N_x-1] = μ[n+1,N_x-2].copy()
     μ[n+1,:,0] = μ[n+1,:,1].copy()
