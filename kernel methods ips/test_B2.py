@@ -1,15 +1,24 @@
 ﻿import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.ticker as mtick
 import shared_functions
 import time
+import matplotlib.ticker as mtick
 from scipy.stats import skew
 
 
 # repeatable randomness
-seed = 1047260852#np.random.randint(2147483647)
+seed = np.random.randint(2147483647)
+seed = 1047260852    # fixed seed for consistent results
 print(f'test_B2.py\t\tseed:\t{seed}')
 rng = np.random.default_rng(seed=seed)
+# matplotlib printing options
+plt.rcParams['figure.dpi'] = 67#200            # resolution of figures in dots per inch. Default is 100
+plt.rcParams['figure.figsize'] = [14.4, 7.2]#[4.8, 3.6] # size of figures in inches. Default is [6.4, 4.8]
+plt.rcParams['figure.autolayout'] = True    # auto-adjust layout to avoid elements clipping outside of figure
+plt.rcParams['savefig.bbox'] = "tight"      # reduce whitespace when saving figures
+# numpy printing options
+np.set_printoptions(linewidth=250)
+
 
 
 ########## Parameters ##########
@@ -77,18 +86,20 @@ for i in range(len(s_values)):
         print(f"\tsolving time step:\t{str(n+1).rjust(len(str(N-1)))} / {N-1}\t({(n+1)/(N-1):.0%})", end="\r")
         if Mˆ == M or Mˆ == 0:
             # solving x
-            diffx = x[n,:] - x[n,:,np.newaxis]    # diffx[i,j] = x_j-v_i    diffx shape: (M, M)
-            x[n+1] = x[n] + (Δt/M) * np.sum(P(diffx) * diffx, 1)     # x[n+1] shape: (M,)
+            diffx = x[n,:] - x[n,:,np.newaxis]    # diffx[i,j] = x_j-x_i    diffx shape: (M, M)
+            x[n+1] = x[n] + (Δt/M ) * np.sum(P(diffx) * diffx, 1)     # x[n+1] shape: (M,)
         else:
             # taking sample of x of size Mˆ
             sample = rng.choice(x[n, :], size=Mˆ, replace=False, shuffle=False)  # shape: (Mˆ,)
-            P_x_s = P(x[n,:,np.newaxis] - sample[:])    # P_x_s[i,j] = P(x_i, x_i_j) where x_i is ith agent, x_i_j is jth sampled agent.  shape: (M, Mˆ)
+            '''P_x_s = P(x[n,:,np.newaxis] - sample[:])    # P_x_s[i,j] = P(x_i, x_i_j) where x_i is ith agent, x_i_j is jth sampled agent.  shape: (M, Mˆ)
             Pi = 1/Mˆ * np.sum(P_x_s, 1)    # Pi[i] = 1/Mˆ * Σⱼ P(x_i, x_i_j)   shape: (M,)
             Xi = 1/Mˆ * np.sum(P_x_s / Pi[:, np.newaxis] * sample[np.newaxis, :], 1)    # Xi[i] = 1/Mˆ * Σⱼ P(x_i, x_i_j)/Pi[i] * x_i_j   shape: (M,)
     
             # solving x
             #diffx = x[n,:] - x[n,:,np.newaxis]    # diffx[i,j] = x_j-v_i    diffx shape: (M, M)
-            x[n+1] = (np.ones((M,)) - Δt*Pi) * x[n] + Δt * Pi * Xi     # x[n+1] shape: (M,)
+            x[n+1] = (np.ones((M,)) - Δt*Pi) * x[n] + Δt * Pi * Xi     # x[n+1] shape: (M,)'''
+            diffx = sample - x[n,:,np.newaxis]    # diffx[i,jˆ] = x_jˆ-x_i    diffx shape: (M, Mˆ)
+            x[n+1] = x[n] + (Δt/Mˆ) * np.sum(P(diffx) * diffx, 1)     # x[n+1] shape: (M,)
     time_end = time.time()
     print()
     print(f'Solving time for M={M}:\n\t{time_end - time_start:.2f} seconds')
@@ -123,15 +134,17 @@ for i in range(len(s_values)):
     fig, axs = plt.subplots(2, 3)
 
     # Title
-    subtitle = f'Agents: $M=${M},   MC-sample of agents: $\\hat{{M}}=${Mˆ},   Timesteps: $N=${N},   Samples of timesteps: $s=${s},   $\\gamma=${γ:.3f},   Regularization: $\\lambda=${λ}'
+    suptitle = f'Agents: $M=${M}'
     if 𝜎:
         # if noisy data was used for interpolation
         dataPointLabel = "noisy data points"
-        fig.suptitle(subtitle + f'   Noise std. dev.: $\\sigma=${𝜎}')
     else:
         # if exact data was used for interpolation
         dataPointLabel = "known data points"
-        fig.suptitle(subtitle)
+    if Mˆ!= M and Mˆ != 0:
+        suptitle += f',   MC-sample of agents: $\\hat{{M}}=${Mˆ}'
+    suptitle += f',   samples: $s=${s},   Regularization: $\\lambda=${λ}'
+    fig.suptitle(suptitle)
 
     # Plotting positions (x) over time (t)
     axs[0, 0].plot(t, x)

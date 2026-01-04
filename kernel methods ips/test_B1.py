@@ -1,11 +1,21 @@
 ﻿import numpy as np
 import matplotlib.pyplot as plt
 import shared_functions
+import time
 
 # repeatable randomness
 seed = np.random.randint(2147483647)
+seed =   86678433    # fixed seed for consistent results
 print(f'test_B1.py\t\tseed:\t{seed}')
 rng = np.random.default_rng(seed=seed)
+# matplotlib printing options
+plt.rcParams['figure.dpi'] = 100            # resolution of figures in dots per inch. Default is 100
+plt.rcParams['figure.figsize'] = [9.6, 7.2] # size of figures in inches. Default is [6.4, 4.8]
+plt.rcParams['figure.autolayout'] = True    # auto-adjust layout to avoid elements clipping outside of figure
+plt.rcParams['savefig.bbox'] = "tight"      # reduce whitespace when saving figures
+# numpy printing options
+np.set_printoptions(linewidth=250)
+
 
 
 ########## Parameters ##########
@@ -31,7 +41,7 @@ x[0,:] = rng.uniform(1.0, 2.0, M)   # random positions in interval [1,2]
 # interpolation parameter
 s_values = np.array([ 2   , 4   , 8   , 4   ])  # number of time samples
 𝜎_values = np.array([ 0.0 , 0.0 , 0.0 , 0.01])  # Add noise to the samples with normal distribution 𝒩(𝜇=0, 𝜎²) (𝜎: standard deviation)
-λ_values = np.array([ 0.0 , 0.0 , 0.0 , 0.001])  # regularization parameter λ for interpolation
+λ_values = np.array([ 0.0 , 0.0 , 0.0 , 0.0001])  # regularization parameter λ for interpolation
 
 
 # Interaction function P(x-xʹ) for opinion dynamics model
@@ -95,18 +105,18 @@ for i in range(len(s_values)):
     L_inf_skw[i] = np.max(err_skw)
     
     ########## Plotting ##########
-    plt.switch_backend('TkAgg')
-    fig, axs = plt.subplots(2, 2)
-    plt.get_current_fig_manager().window.state('zoomed')    # fullscreen window
     if 𝜎:
         # if noisy data was used for interpolation
         dataPointLabel = "noisy data points"
-        fig.suptitle(f'Samples: $s=${s},   Regularization: $\\lambda=${λ},   Noise standard deviation: $\\sigma=${𝜎}')
+        suptitle = f'Samples: $s=${s},   Regularization: $\\lambda=${λ},   Noise standard deviation: $\\sigma=${𝜎}'
     else:
         # if exact data was used for interpolation
         dataPointLabel = "known data points"
-        fig.suptitle(f'Samples: $s=${s},   Regularization: $\\lambda=${λ}')
+        suptitle = f'Samples: $s=${s},   Regularization: $\\lambda=${λ}'
 
+    # Plotting Variance and Skewness with errors:
+    fig, axs = plt.subplots(2, 2)
+    fig.suptitle(suptitle)
     # Variance of positions (x_var) and interpolated (x_var_int) over time (t)
     axs[0,0].plot(t, x_var, label="true variance $v_M$")
     axs[0,0].plot(t, x_var_int, 'r--', label="interp. variance $\\hat{v}_M$")
@@ -116,7 +126,6 @@ for i in range(len(s_values)):
     axs[0,0].set_title("Positions variance")
     axs[0,0].set_xlabel("$t$")
     axs[0,0].legend()
-    
     # Skewness of positions (x_skw) and interpolated (x_skw_int) over time (t)
     axs[0,1].plot(t, x_skw, label="true skewness $s_M$")
     axs[0,1].plot(t, x_skw_int, 'r--', label="interp. skewness $\\hat{s}_M$")
@@ -125,23 +134,36 @@ for i in range(len(s_values)):
     axs[0,1].set_title("Positions skewness")
     axs[0,1].set_xlabel("$t$")
     axs[0,1].legend()
-
     # error plot variance
     axs[1,0].semilogy(t, err_var, '.', label="error")
     axs[1,0].plot(t_samples, err_var[t_samples_indices], marker='o', markeredgecolor='r', fillstyle='none', linestyle=' ', label=dataPointLabel)
     axs[1,0].set_xlim(t_0, T)  # set x-axis to interval [t_0, T]
     axs[1,0].set_title("Error for variance")
     axs[1,0].legend()
-    #plt.show()
-
     # error plot skewness
     axs[1,1].semilogy(t, err_skw, '.', label="error")
     axs[1,1].plot(t_samples, err_skw[t_samples_indices], marker='o', markeredgecolor='r', fillstyle='none', linestyle=' ', label=dataPointLabel)
     axs[1,1].set_xlim(t_0, T)  # set x-axis to interval [t_0, T]
     axs[1,1].set_title("Error for skewness")
     axs[1,1].legend()
-
     plt.show()
+    
+    # Plotting only the errors:
+    '''fig, axs = plt.subplots(1, 2)
+    fig.suptitle(suptitle)
+    # error plot variance
+    axs[0].semilogy(t, err_var, '.', label="error")
+    axs[0].plot(t_samples, err_var[t_samples_indices], marker='o', markeredgecolor='r', fillstyle='none', linestyle=' ', label=dataPointLabel)
+    axs[0].set_xlim(t_0, T)  # set x-axis to interval [t_0, T]
+    axs[0].set_title("Error for variance")
+    axs[0].legend()
+    # error plot skewness
+    axs[1].semilogy(t, err_skw, '.', label="error")
+    axs[1].plot(t_samples, err_skw[t_samples_indices], marker='o', markeredgecolor='r', fillstyle='none', linestyle=' ', label=dataPointLabel)
+    axs[1].set_xlim(t_0, T)  # set x-axis to interval [t_0, T]
+    axs[1].set_title("Error for skewness")
+    axs[1].legend()
+    plt.show()'''
 
 np.set_printoptions(linewidth=80)
 print(f'\nError table:\n  noise std dev |regulariz.para|interp.samples|   L_inf_var  |   L_inf_skw  \n----------------+--------------+--------------+--------------+---------------\n{np.stack((𝜎_values, λ_values, s_values, L_inf_var, L_inf_skw)).transpose()}\n')

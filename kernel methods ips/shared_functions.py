@@ -40,13 +40,16 @@ def k_γ_doubleSum(x, xʹ, γ=1.0/np.sqrt(2)):
 
 
 
+
+
+
 def interpolate(x_full, x_samples_indices, y_samples, k, λ=0.0, Mˆ=0):
     """
     Performs kernel interpolation using the kernel function k.
-    Returns the interpolated values at all time steps t_full.
+    Returns the interpolated values at all c values x_full.
     - x_full: full x-axis
     - x_samples_indices: indices of sampled time steps in x_full
-    - y_samples: sampled values at t_full[t_x_samples_indices]
+    - y_samples: sampled values at x_full[x_samples_indices]
     - k: kernel function to compute the Kernel/Gram matrix K
     - λ: optional regularization parameter (0.0 = no regularization)
     - Mˆ: if elements in x_full are vector-valued, then Mˆ is size of 

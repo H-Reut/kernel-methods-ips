@@ -1,11 +1,21 @@
 ﻿import numpy as np
 import matplotlib.pyplot as plt
 import shared_functions
+import time
 
 # repeatable randomness
 seed = np.random.randint(2147483647)
+seed =  700412404    # fixed seed for consistent results
 print(f'test_A1.py\t\tseed:\t{seed}')
 rng = np.random.default_rng(seed=seed)
+# matplotlib printing options
+plt.rcParams['figure.dpi'] = 200            # resolution of figures in dots per inch. Default is 100
+plt.rcParams['figure.figsize'] = [4.8, 3.6] # size of figures in inches. Default is [6.4, 4.8]
+plt.rcParams['figure.autolayout'] = True    # auto-adjust layout to avoid elements clipping outside of figure
+plt.rcParams['savefig.bbox'] = "tight"      # reduce whitespace when saving figures
+# numpy printing options
+np.set_printoptions(linewidth=250)
+
 
 
 ########## Parameters ##########
@@ -14,13 +24,13 @@ t_0 =    0                      # start time
 T   =   10                      # end time
 N   = 1000                      # number of time steps
 Δt  = (T-t_0) / N               # Δt
-t   = np.linspace(t_0, T, N)    # all time steps
-print(f'Time interval:\tt_0 = {t_0}\t\tT = {T}\nTime steps:\tN = {N}')
+t   = np.linspace(t_0, T, N+1)  # all time steps
+print(f'Time interval:\tt_0 = {t_0}\t\tT = {T}\nTime steps:\tN = {N}\tΔt= {Δt}')
 
 # agents
 M   = 30                        # number of agents
-x   = np.zeros((N,M))           # positions
-v   = np.zeros((N,M))           # velocities
+x   = np.zeros((N+1,M))         # positions
+v   = np.zeros((N+1,M))         # velocities
 print(f'Number of agents:\tM = {M}')
 
 # initial values
@@ -43,22 +53,8 @@ def H_β(diff, β=2.0):
 
 
 ########## Solving positions (x) and velocities (v) ##########
-# iterative solver (slower)
-'''for n in range(N-1):
-    print(f"\tsolving time step:\t{str(n+1).rjust(len(str(N-1)))} / {N-1}\t({(n+1)/(N-1):.0%})", end="\r")
-    # solving x
-    x[n+1,:] = x[n,:] + Δt*v[n,:]
-    # solving v
-    for i in range(M):
-        sum = 0.0
-        for j in range(M):
-            sum += H_β(x[n,i] - x[n,j]) * (v[n,j] - v[n,i])
-        v[n+1,i] = v[n,i] + (Δt/M)*sum 
-print()'''
-
-# numpy solver (faster)
-for n in range(N-1):
-    print(f"\tsolving time step:\t{str(n+1).rjust(len(str(N-1)))} / {N-1}\t({(n+1)/(N-1):.0%})", end="\r")
+for n in range(N):
+    print(f"\tsolving time step:\t{str(n+1).rjust(len(str(N)))} / {N}\t({(n+1)/(N):.0%})", end="\r")
     # solving x
     x[n+1,:] = x[n,:] + Δt*v[n,:]       # x[n+1,:] shape: (M,)
     # solving v
@@ -84,12 +80,23 @@ plt.xlabel("$t$")
 plt.ylabel("$v$")
 plt.show()
 
+# Plotting phase space of positions (x) vs velocities (v) at initial and final time
+style = ['r.', 'g.', 'b.', 'c.', 'm.', 'y.', 'k.']
+indices =  [0,  100,  200,  400,  600,  800, 1000]
+for i in range(len(indices)):
+    plt.plot(v[indices[i], :], x[indices[i], :], style[i], label=f"t[{indices[i]}]={t[indices[i]]}")
+plt.title("Phase space: positions vs velocities")
+plt.xlabel("$x$")
+plt.ylabel("$v$")
+plt.legend()
+plt.show()
+
 
 ########## Variance of v and interpolation ##########
 v_var = v.var(axis=1)
 
 # interpolation of v_var
-t_samples_indices = ((N-1)//(s-1)) * np.arange(0, s, 1)
+t_samples_indices = (N//(s-1)) * np.arange(0, s, 1)
 t_samples = t[t_samples_indices]
 y = v_var[t_samples_indices]
 v_var_int = shared_functions.interpolate(t, t_samples_indices, y, lambda x, xʹ: shared_functions.k_γ(x, xʹ, γ))
@@ -109,7 +116,7 @@ plt.show()
 err = np.abs(v_var - v_var_int)
 
 # Plotting:
-plt.semilogy(t, err, '.', label="error")
+plt.semilogy(t, err, '.', label="error $t \\mapsto \\left| \\mathcal{V}_M - \\mathcal{\\hat{V}}_M \\right|$")
 '''locations, labels = plt.xticks()
 plt.xticks(t_samples, minor=False)
 plt.grid(True, which='major', axis='x')
@@ -117,5 +124,6 @@ plt.xticks(locations, labels=locations, minor=True)'''
 plt.plot(t_samples, err[t_samples_indices], marker='o', markeredgecolor='r', fillstyle='none', linestyle=' ', label="known data points")
 plt.gca().set_xlim(t_0, T)  # set x-axis to interval [t_0, T]
 plt.title("Error")
+plt.xlabel("$t$")
 plt.legend()
 plt.show()

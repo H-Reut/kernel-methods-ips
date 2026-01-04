@@ -1,11 +1,22 @@
 ﻿import numpy as np
 import matplotlib.pyplot as plt
 import shared_functions
+import time
 
 # repeatable randomness
 seed = np.random.randint(2147483647)
+seed = 2109032976    # fixed seed for consistent results
 print(f'test_A2.py\t\tseed:\t{seed}')
 rng = np.random.default_rng(seed=seed)
+# matplotlib printing options
+plt.rcParams['figure.dpi'] = 200            # resolution of figures in dots per inch. Default is 100
+plt.rcParams['figure.figsize'] = [4.8, 3.6] # size of figures in inches. Default is [6.4, 4.8]
+plt.rcParams['figure.autolayout'] = True    # auto-adjust layout to avoid elements clipping outside of figure
+plt.rcParams['savefig.bbox'] = "tight"      # reduce whitespace when saving figures
+# numpy printing options
+np.set_printoptions(linewidth=250)
+
+
 
 
 ########## Parameters ##########
@@ -102,5 +113,6 @@ plt.grid(True, which='major', axis='x')
 plt.xticks(locations, labels=locations, minor=True)'''
 plt.plot(β_samples, err[β_samples_indices], marker='o', markeredgecolor='r', fillstyle='none', linestyle=' ', label="known data points")
 plt.title("Error")
+plt.xlabel("$\\beta$")
 plt.legend()
 plt.show()
